@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+api/node_modules/
+
+# Environment and secrets
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.crt
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+
+# Local data files
+*.db
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+api/data/
+
+# Build and cache
+dist/
+build/
+coverage/
