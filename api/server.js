@@ -726,6 +726,9 @@ app.post("/api/settings/stats-visibility", requireAdmin, (req, res) => {
   );
 });
 
+app.use(express.static(path.join(__dirname, "../site")));
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`API rodando na porta ${PORT}`);
+  console.log(`Acesse: http://localhost:${PORT}`);
 });

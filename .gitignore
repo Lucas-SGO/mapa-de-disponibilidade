@@ -16,11 +16,11 @@ logs/
 npm-debug.log*
 
 # Local data files
-*.db
-*.sqlite
 *.sqlite-shm
 *.sqlite-wal
-api/data/
+
+# Include the database but not WAL artifacts
+!api/data/units.db
 
 # Build and cache
 dist/
