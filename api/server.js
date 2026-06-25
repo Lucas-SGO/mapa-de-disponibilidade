@@ -75,10 +75,12 @@ db.serialize(() => {
       bloco TEXT NOT NULL,
       unidade TEXT NOT NULL,
       status TEXT NOT NULL,
+      manual_override INTEGER NOT NULL DEFAULT 0,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (bloco, unidade)
     )
   `);
+  db.run(`ALTER TABLE unit_statuses ADD COLUMN manual_override INTEGER NOT NULL DEFAULT 0`, () => {});
 
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
@@ -385,12 +387,14 @@ app.post("/api/status", requireAdmin, async (req, res) => {
   }
 
   try {
+    // manual_override: 1 se admin avançou (reserved/sold), 0 se voltou para available
+    const override = status !== "available" ? 1 : 0;
     await dbRun(
-      `
-      INSERT OR REPLACE INTO unit_statuses (bloco, unidade, status, updated_at)
-      VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-      `,
-      [String(bloco), String(unidade), status]
+      `INSERT INTO unit_statuses (bloco, unidade, status, manual_override, updated_at)
+       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(bloco, unidade)
+       DO UPDATE SET status = excluded.status, manual_override = excluded.manual_override, updated_at = CURRENT_TIMESTAMP`,
+      [String(bloco), String(unidade), status, override]
     );
 
     if (status === "available") {

@@ -2,6 +2,12 @@
 """
 Sincroniza status de unidades do WE Barra By Living via API Cyrela → SQLite espelho.
 Uso: python3 sync-cyrela.py [--dry-run]
+
+Regra de override:
+  O sync nunca retrocede uma unidade no fluxo Disponível → Reservado → Vendido.
+  Se o admin adiantou uma unidade em relação ao CRM, mantém a decisão do admin.
+  Se o CRM avançou além do admin, segue o CRM.
+  Resultado = max(status_atual_db, status_crm) no fluxo.
 """
 
 import urllib.request
@@ -27,7 +33,7 @@ BLOCO_MAP = {
 # Cyrela Value → status do espelho
 STATUS_MAP = {
     3:  "available",  # DI - Disponível
-    19: "available",  # TR - Triagem
+    19: "reserved",   # TR - Triagem
     1:  "sold",       # AS - Venda Imputada
     12: "sold",       # AG - Suporte
     10: "reserved",   # CA - Contrato na Rua
@@ -47,6 +53,9 @@ STATUS_MAP = {
     18: "reserved",   # NL - Não Lançada
     20: "reserved",   # AN
 }
+
+# Ordem do fluxo — nunca retrocede
+STATUS_ORDER = {"available": 0, "reserved": 1, "sold": 2}
 
 dry_run = "--dry-run" in sys.argv
 
@@ -84,7 +93,14 @@ def main():
     db_path = os.path.join(os.path.dirname(__file__), "data", "units.db")
     db = sqlite3.connect(db_path)
 
+    # Lê status actuais do DB para aplicar regra de override
+    current_db = {
+        f"{row[0]}_{row[1]}": {"status": row[2], "override": bool(row[3])}
+        for row in db.execute("SELECT bloco, unidade, status, manual_override FROM unit_statuses").fetchall()
+    }
+
     counts = {"available": 0, "reserved": 0, "sold": 0}
+    protected = 0  # unidades onde admin está à frente do CRM
     unknown_statuses = []
     unknown_blocos = []
 
@@ -97,21 +113,40 @@ def main():
 
         unidade = str(int(u["Nome"]))  # '000101' → '101'
         status_value = u["StatusUnidade"]["Value"]
-        status = STATUS_MAP.get(status_value)
+        crm_status = STATUS_MAP.get(status_value)
 
-        if status is None:
+        if crm_status is None:
             unknown_statuses.append((bloco_name, unidade, status_value, u["StatusUnidade"]["Label"]))
             continue
 
-        counts[status] += 1
+        # Regra de override: só protege unidades que o admin tocou manualmente
+        current = current_db.get(f"{bloco}_{unidade}", {"status": "available", "override": False})
+        current_status = current["status"]
+        is_override = current["override"]
+
+        if STATUS_ORDER[crm_status] >= STATUS_ORDER[current_status]:
+            # CRM avançou ou igualou — segue o CRM e limpa override
+            final_status = crm_status
+            new_override = 0
+        elif is_override:
+            # Admin está à frente do CRM — protege
+            final_status = current_status
+            new_override = 1
+            protected += 1
+        else:
+            # CRM recuou numa unidade que o admin não tocou — segue o CRM
+            final_status = crm_status
+            new_override = 0
+
+        counts[final_status] += 1
 
         if not dry_run:
             db.execute(
-                """INSERT INTO unit_statuses (bloco, unidade, status)
-                   VALUES (?, ?, ?)
+                """INSERT INTO unit_statuses (bloco, unidade, status, manual_override)
+                   VALUES (?, ?, ?, ?)
                    ON CONFLICT(bloco, unidade)
-                   DO UPDATE SET status = excluded.status, updated_at = CURRENT_TIMESTAMP""",
-                (bloco, unidade, status),
+                   DO UPDATE SET status = excluded.status, manual_override = excluded.manual_override, updated_at = CURRENT_TIMESTAMP""",
+                (bloco, unidade, final_status, new_override),
             )
 
     if not dry_run:
@@ -121,6 +156,8 @@ def main():
     print(f"  available : {counts['available']}")
     print(f"  reserved  : {counts['reserved']}")
     print(f"  sold      : {counts['sold']}")
+    if protected:
+        print(f"  protegidas (admin à frente do CRM): {protected}")
 
     if unknown_statuses:
         print(f"\n  ATENÇÃO — {len(unknown_statuses)} unidade(s) com status desconhecido (não actualizadas):")
