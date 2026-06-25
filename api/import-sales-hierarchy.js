@@ -2,7 +2,7 @@ const path = require("path");
 const sqlite3 = require("sqlite3").verbose();
 const XLSX = require("xlsx");
 
-const defaultExcelPath = path.join(__dirname, "..", "..", "Corretores.xlsx");
+const defaultExcelPath = path.join(__dirname, "..", "assets", "data", "corretores-ativos.xlsx");
 const excelPath = process.argv[2] ? path.resolve(process.argv[2]) : defaultExcelPath;
 const dbPath = path.join(__dirname, "data", "units.db");
 

@@ -26,3 +26,11 @@ npm-debug.log*
 dist/
 build/
 coverage/
+
+# Python
+__pycache__/
+*.pyc
+
+# Large files (exceed GitHub 100MB limit)
+assets/brand/we-marca-v2.pdf
+assets/images/render-02.jpg
