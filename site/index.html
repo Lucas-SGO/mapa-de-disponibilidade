@@ -1916,6 +1916,8 @@
   [data-theme="light"] .andar-item.active { background: #d4ccbc; border-left-color: var(--gold); }
   [data-theme="light"] .minimap-card { background: #f5f2ec; border-color: #d8d0c4; }
   [data-theme="light"] .minimap-cell { background: #c8bca8; }
+  [data-theme="light"] .minimap-cell.reserved { background: #c47d00; }
+  [data-theme="light"] .minimap-cell.sold { background: #b8202e; }
   [data-theme="light"] .section-label::after { background: #c8bca8; }
 
   /* Unit cards */
@@ -3989,15 +3991,15 @@ async function syncFromServer() {
       applyVisibility();
 
       if (!isAdmin()) {
-        const { soldTransitions, changedCount } = detectStatusChanges(previousStatuses, latestStatuses);
-        if (soldTransitions.length === 1 && changedCount === 1) {
-          const [blocoRaw, unidadeRaw] = soldTransitions[0].split('_');
+        const { soldTransitions } = detectStatusChanges(previousStatuses, latestStatuses);
+        soldTransitions.forEach((key, i) => {
+          const [blocoRaw, unidadeRaw] = key.split('_');
           const bloco = Number(blocoRaw);
           const unidade = Number(unidadeRaw);
           if (!Number.isNaN(bloco) && !Number.isNaN(unidade)) {
-            showCelebration(bloco, unidade);
+            setTimeout(() => showCelebration(bloco, unidade), i * 15000);
           }
-        }
+        });
       }
 
       if (modalUnitKey) {

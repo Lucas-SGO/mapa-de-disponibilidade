@@ -1,6 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 const session = require("express-session");
+const BetterSqlite3 = require("better-sqlite3");
+const BetterSqlite3Store = require("better-sqlite3-session-store")(session);
 const bcrypt = require("bcryptjs");
 const sqlite3 = require("sqlite3").verbose();
 const path = require("path");
@@ -53,7 +55,9 @@ function dbAll(sql, params = []) {
   });
 }
 
+const sessionDb = new BetterSqlite3(path.join(dataDir, "sessions.db"));
 app.use(session({
+  store: new BetterSqlite3Store({ client: sessionDb, expired: { clear: true, intervalMs: 1000 * 60 * 15 } }),
   secret: process.env.SESSION_SECRET || "troque-essa-chave-secreta-agora",
   resave: false,
   saveUninitialized: false,
